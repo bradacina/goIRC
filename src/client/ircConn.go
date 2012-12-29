@@ -1,26 +1,29 @@
-// client project client.go
 package client
 
 import "net"
 import "log"
 import "strings"
-
-//import "time"
+import "errors"
 
 type IRCConn struct {
 	con      *net.TCPConn
 	Nickname string
 	Username string
+	Channels []Channel
 }
 
 func NewIRCConn() *IRCConn {
 	var c = new(IRCConn)
+
+	// TODO: need to set these parameters in a config file or config step
 	c.Nickname = "Asdasd23444"
 	c.Username = "dssfds"
 
 	return c
 }
 
+// connects to an irc server
+// address if of the form "irc.freenode.net:6667"
 func (this *IRCConn) Connect(address string) error {
 
 	var addr, err = net.ResolveTCPAddr("tcp", address)
@@ -48,6 +51,7 @@ func (this *IRCConn) Disconnect() error {
 	return this.con.Close()
 }
 
+// listens for incoming messages from the irc server
 func (this *IRCConn) listenForIncoming() {
 
 	var b = make([]byte, 1024)
@@ -90,39 +94,15 @@ func (this *IRCConn) listenForIncoming() {
 	}
 }
 
-func (this *IRCConn) SendMessage(message string) error {
-
-	if message[len(message)-1] != '\n' {
-		message = message + "\n"
-	}
-
-	log.Print(">>>", message)
-	_, err := this.con.Write([]byte(message))
-
-	return err
-}
-
-func (this *IRCConn) SetNickname(nickname string) error {
-
-	msg := "NICK " + nickname
-	return this.SendMessage(msg)
-}
-
-func (this *IRCConn) SetUser(username string) error {
-	msg := "USER " + username + " " + "3 * :" + username
-	return this.SendMessage(msg)
-}
-
-func (this *IRCConn) handlePing(params string) error {
-	msg := "PONG " + params
-	return this.SendMessage(msg)
-}
-
+// tokenizes a message sent from the server, extracts the prefix, command
+// and parameters and lets the handleCommand method do the rest
 func (this *IRCConn) translateMessage(message string) {
+
 	initialTokens := strings.Split(message, " ")
 
 	var tokens []string
 
+	// get rid of empty tokens
 	for _, val := range initialTokens {
 		if len(val) != 0 {
 			tokens = append(tokens, val)
@@ -138,7 +118,7 @@ func (this *IRCConn) translateMessage(message string) {
 			_ = tokens[0]
 
 			if len(tokens) < 2 {
-				// bad message format
+				log.Println("Error: Bad message format. Got Prefix but no Command.")
 				return
 			}
 
@@ -157,11 +137,5 @@ func (this *IRCConn) translateMessage(message string) {
 		}
 	}
 
-	if command == "PING" {
-		this.handlePing(params[0])
-	}
-
-	if command == "433" {
-		this.SetNickname("o435323234")
-	}
+	this.handleCommand(command, params)
 }
