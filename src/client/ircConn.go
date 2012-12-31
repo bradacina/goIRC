@@ -3,28 +3,34 @@ package client
 import "net"
 import "log"
 import "strings"
-import "errors"
 
 type IRCConn struct {
-	con      *net.TCPConn
-	Nickname string
-	Username string
-	Channels []Channel
+	con               *net.TCPConn
+	Nickname          string
+	Username          string
+	Channels          map[string]Channel
+	AltNicknames      []string
+	lastTriedNickname int
 }
 
 func NewIRCConn() *IRCConn {
 	var c = new(IRCConn)
 
+	c.Channels = make(map[string]Channel)
+
 	// TODO: need to set these parameters in a config file or config step
-	c.Nickname = "Asdasd23444"
 	c.Username = "dssfds"
+
+	c.AltNicknames = make([]string, 2)
+	c.AltNicknames[0] = "Asdasd23244"
+	c.AltNicknames[1] = "blahblah2324"
 
 	return c
 }
 
 // connects to an irc server
 // address if of the form "irc.freenode.net:6667"
-func (this *IRCConn) Connect(address string) error {
+func (self *IRCConn) Connect(address string) error {
 
 	var addr, err = net.ResolveTCPAddr("tcp", address)
 	if err != nil {
@@ -32,37 +38,37 @@ func (this *IRCConn) Connect(address string) error {
 		return err
 	}
 
-	this.con, err = net.DialTCP("tcp", nil, addr)
+	self.con, err = net.DialTCP("tcp", nil, addr)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
-	go this.listenForIncoming()
+	go self.listenForIncoming()
 
-	this.SetNickname(this.Nickname)
+	self.SetNickname(self.AltNicknames[self.lastTriedNickname])
 
-	this.SetUser(this.Username)
+	self.SetUser(self.Username)
 
 	return nil
 }
 
-func (this *IRCConn) Disconnect() error {
-	return this.con.Close()
+func (self *IRCConn) Disconnect() error {
+	return self.con.Close()
 }
 
 // listens for incoming messages from the irc server
-func (this *IRCConn) listenForIncoming() {
+func (self *IRCConn) listenForIncoming() {
 
 	var b = make([]byte, 1024)
 	var leftOver string
 	var haveLeftOver bool
 
 	for {
-		n, err := this.con.Read(b)
+		n, err := self.con.Read(b)
 		if err != nil {
 			log.Println(err)
-			this.Disconnect()
+			self.Disconnect()
 			break
 		}
 
@@ -89,14 +95,14 @@ func (this *IRCConn) listenForIncoming() {
 				continue
 			}
 			log.Println("<<<", val)
-			this.translateMessage(val)
+			self.translateMessage(val)
 		}
 	}
 }
 
 // tokenizes a message sent from the server, extracts the prefix, command
 // and parameters and lets the handleCommand method do the rest
-func (this *IRCConn) translateMessage(message string) {
+func (self *IRCConn) translateMessage(message string) {
 
 	initialTokens := strings.Split(message, " ")
 
@@ -137,5 +143,5 @@ func (this *IRCConn) translateMessage(message string) {
 		}
 	}
 
-	this.handleCommand(command, params)
+	self.handleCommand(command, params)
 }

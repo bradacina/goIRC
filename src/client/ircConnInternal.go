@@ -2,36 +2,46 @@ package client
 
 // This is the place where all IRCConn internal struct modifications are done
 
+import "log"
+
 // internaly changes the topic of a specific channel
-func (this *IRCConn) changeChannelTopic(chanName string, topic string) {
+func (self *IRCConn) changeChannelTopic(chanName string, topic string) {
 
-	found := false
+	val, ok := self.Channels[chanName]
 
-	for _, val := range this.Channels {
-		if val.Name == chanName {
-			val.Topic = topic
-			found = true
-		}
-	}
-
-	if !found {
+	if !ok {
 		log.Println("ERROR: Cannot find channel for which to change topic")
+		return
 	}
 
+	val.Topic = topic
 }
 
 // adds a channel to the internal IRCConn.Channels structure
-func (this *IRCConn) addChannel(chanName string, topic string) {
+func (self *IRCConn) addChannel(chanName string, topic string) {
 
-	for _, val := range this.Channels {
-		if val.Name == chanName {
-			log.Println("ERROR: You are already on that channel")
-			return
-		}
+	_, ok := self.Channels[chanName]
+
+	if ok {
+		log.Println("ERROR: We have already added that channel")
+		return
 	}
 
 	channel := NewChannel(chanName)
 	channel.Topic = topic
 
-	this.Channels = append(this.Channels, channel)
+	self.Channels[chanName] = channel
+}
+
+func (self *IRCConn) setChannelNames(chanName string, names []string) {
+
+	val, ok := self.Channels[chanName]
+	if !ok {
+		log.Println("ERROR: Cannot find channel on which to set the names")
+		return
+	}
+
+	log.Println("INTERNAL: Setting channel names for", chanName, "to", names)
+	val.Names = names
+
 }

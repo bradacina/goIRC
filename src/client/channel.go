@@ -1,9 +1,9 @@
 package client
 
 type Channel struct {
-	Name    string
-	Topic   string
-	Members []string
+	Name  string
+	Topic string
+	Names []string
 }
 
 func NewChannel(name string) Channel {

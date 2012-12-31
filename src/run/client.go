@@ -4,7 +4,7 @@ import "client"
 import "fmt"
 
 //import "time"
-//import "log"
+import "log"
 
 var replChan = make(chan string, 1)
 
@@ -29,6 +29,8 @@ func repl() {
 	for {
 		select {
 		case command := <-replChan:
+
+			log.Println("INTERNAL: got user command:", command)
 			if command == "quit" {
 				done <- true
 			}
@@ -41,6 +43,17 @@ func repl() {
 				ircConn.SetTopic("#animosity", "hi hi hi")
 			}
 
+			if command == "-i" {
+				ircConn.UnsetInvisible()
+			}
+
+			if command == "+i" {
+				ircConn.SetInvisible()
+			}
+
+			if command == "q" {
+				ircConn.Quit("")
+			}
 		}
 	}
 }

@@ -1,40 +1,59 @@
 package client
 
+import "log"
+
 // sends a message to the irc server
-func (this *IRCConn) SendMessage(message string) error {
+func (self *IRCConn) SendMessage(message string) error {
 
 	if message[len(message)-1] != '\n' {
 		message = message + "\n"
 	}
 
 	log.Print(">>>", message)
-	_, err := this.con.Write([]byte(message))
+	_, err := self.con.Write([]byte(message))
 
 	return err
 }
 
 // sends the NICK command to the irc server requesting a nickname change
-func (this *IRCConn) SetNickname(nickname string) error {
+func (self *IRCConn) SetNickname(nickname string) error {
 
 	msg := NICK + SPACE + nickname
-	return this.SendMessage(msg)
+	self.Nickname = nickname
+	return self.SendMessage(msg)
 }
 
 // sends the USER command to the irc server
-func (this *IRCConn) SetUser(username string) error {
+func (self *IRCConn) SetUser(username string) error {
 	msg := USER + SPACE + username + SPACE + "3 * :" + username
-	return this.SendMessage(msg)
+	return self.SendMessage(msg)
+}
+
+// set ourselves as invisible
+func (self *IRCConn) SetInvisible() error {
+	msg := MODE + SPACE + self.Nickname + SPACE + "+i"
+	return self.SendMessage(msg)
+}
+
+func (self *IRCConn) UnsetInvisible() error {
+	msg := MODE + SPACE + self.Nickname + SPACE + "-i"
+	return self.SendMessage(msg)
+}
+
+func (self *IRCConn) Quit(quitMsg string) error {
+	msg := QUIT + SPACE + quitMsg
+	return self.SendMessage(msg)
 }
 
 // sends the JOIN command to the irc server requesting that we join a channel
-func (this *IRCConn) JoinChannel(channel string) error {
+func (self *IRCConn) JoinChannel(channel string) error {
 	msg := JOIN + SPACE + channel
-	return this.SendMessage(msg)
+	return self.SendMessage(msg)
 }
 
 // sends the TOPIC command to the irc server requesting that we set a
 // channels topic
-func (this *IRCConn) SetTopic(chanName string, topic string) error {
+func (self *IRCConn) SetTopic(chanName string, topic string) error {
 
 	var colon string
 
@@ -43,5 +62,12 @@ func (this *IRCConn) SetTopic(chanName string, topic string) error {
 	}
 
 	msg := TOPIC + SPACE + chanName + SPACE + colon + topic
-	return this.SendMessage(msg)
+	return self.SendMessage(msg)
+}
+
+// send the TOPIC command to the irc server requesting to retrieve a
+// channels topic
+func (self *IRCConn) GetTopic(chanName string) error {
+	msg := TOPIC + SPACE + chanName
+	return self.SendMessage(msg)
 }
