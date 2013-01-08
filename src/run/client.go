@@ -12,9 +12,13 @@ var done = make(chan bool, 1)
 
 var ircConn = client.NewIRCConn()
 
+var nickname = "asdas123456"
+
 func main() {
 
-	ircConn.Connect("irc.freenode.net:6667")
+	go listenCon()
+
+	ircConn.Connect("irc.freenode.net:6667", nickname, "asd")
 
 	go repl()
 
@@ -23,6 +27,19 @@ func main() {
 	<-done
 
 	ircConn.Disconnect()
+}
+
+func listenCon() {
+	for {
+		select {
+		case ntf := <-ircConn.ChannelNames():
+			log.Println("MAIN: ", ntf.ChannelName, " ", ntf.Names)
+		case ntf := <-ircConn.Topic():
+			log.Println("MAIN: ", ntf.ChannelName, " ", ntf.Topic)
+		case <-ircConn.NeedNickname():
+			log.Println("MAIN: NEED NEW NICKNAME")
+		}
+	}
 }
 
 func repl() {
@@ -44,15 +61,27 @@ func repl() {
 			}
 
 			if command == "-i" {
-				ircConn.UnsetInvisible()
+				ircConn.UnsetInvisible(nickname)
 			}
 
 			if command == "+i" {
-				ircConn.SetInvisible()
+				ircConn.SetInvisible(nickname)
 			}
 
 			if command == "q" {
 				ircConn.Quit("")
+			}
+
+			if command == "A" {
+				ircConn.SetAway("")
+			}
+
+			if command == "a" {
+				ircConn.UnsetAway()
+			}
+
+			if command == "p" {
+				ircConn.PartChannel("#animosity", "asd a sad asd")
 			}
 		}
 	}

@@ -4,33 +4,53 @@ import "net"
 import "log"
 import "strings"
 
+type messageHandler func(*IRCConn, string, []string) error
+
 type IRCConn struct {
-	con               *net.TCPConn
-	Nickname          string
-	Username          string
-	Channels          map[string]Channel
-	AltNicknames      []string
-	lastTriedNickname int
+	con *net.TCPConn
+
+	channelNames chan ChannelNamesNotification
+	topic        chan TopicNotification
+	needNickname chan bool
+
+	// keeps a map between incoming messages and their handler functions
+	messageMap map[string]messageHandler
 }
 
 func NewIRCConn() *IRCConn {
 	var c = new(IRCConn)
 
-	c.Channels = make(map[string]Channel)
+	c.messageMap = make(map[string]messageHandler)
 
-	// TODO: need to set these parameters in a config file or config step
-	c.Username = "dssfds"
+	c.buildMessageMap()
 
-	c.AltNicknames = make([]string, 2)
-	c.AltNicknames[0] = "Asdasd23244"
-	c.AltNicknames[1] = "blahblah2324"
+	c.channelNames = make(chan ChannelNamesNotification, 10)
+	c.topic = make(chan TopicNotification, 10)
+	c.needNickname = make(chan bool, 10)
 
 	return c
 }
 
+// returns a chan on which we send notifications when channel names are received
+// from the irc server
+func (ircCon *IRCConn) ChannelNames() <-chan ChannelNamesNotification {
+	return ircCon.channelNames
+}
+
+// returns a chan on which we send notifications when channel topic changes are
+// received from the irc server
+func (ircCon *IRCConn) Topic() <-chan TopicNotification {
+	return ircCon.topic
+}
+
+// returns a chan on which we send notifications when our nickname needs to be changed
+func (ircCon *IRCConn) NeedNickname() <-chan bool {
+	return ircCon.needNickname
+}
+
 // connects to an irc server
 // address if of the form "irc.freenode.net:6667"
-func (self *IRCConn) Connect(address string) error {
+func (ircCon *IRCConn) Connect(address string, nickname string, user string) error {
 
 	var addr, err = net.ResolveTCPAddr("tcp", address)
 	if err != nil {
@@ -38,37 +58,37 @@ func (self *IRCConn) Connect(address string) error {
 		return err
 	}
 
-	self.con, err = net.DialTCP("tcp", nil, addr)
+	ircCon.con, err = net.DialTCP("tcp", nil, addr)
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
-	go self.listenForIncoming()
+	go ircCon.listenForIncoming()
 
-	self.SetNickname(self.AltNicknames[self.lastTriedNickname])
+	ircCon.SetNickname(nickname)
 
-	self.SetUser(self.Username)
+	ircCon.SetUser(user)
 
 	return nil
 }
 
-func (self *IRCConn) Disconnect() error {
-	return self.con.Close()
+func (ircCon *IRCConn) Disconnect() error {
+	return ircCon.con.Close()
 }
 
 // listens for incoming messages from the irc server
-func (self *IRCConn) listenForIncoming() {
+func (ircCon *IRCConn) listenForIncoming() {
 
 	var b = make([]byte, 1024)
 	var leftOver string
 	var haveLeftOver bool
 
 	for {
-		n, err := self.con.Read(b)
+		n, err := ircCon.con.Read(b)
 		if err != nil {
 			log.Println(err)
-			self.Disconnect()
+			ircCon.Disconnect()
 			break
 		}
 
@@ -95,14 +115,14 @@ func (self *IRCConn) listenForIncoming() {
 				continue
 			}
 			log.Println("<<<", val)
-			self.translateMessage(val)
+			ircCon.translateMessage(val)
 		}
 	}
 }
 
 // tokenizes a message sent from the server, extracts the prefix, command
 // and parameters and lets the handleCommand method do the rest
-func (self *IRCConn) translateMessage(message string) {
+func (ircCon *IRCConn) translateMessage(message string) {
 
 	initialTokens := strings.Split(message, " ")
 
@@ -116,12 +136,12 @@ func (self *IRCConn) translateMessage(message string) {
 	}
 
 	var command string
-	//var prefix string
+	var prefix string
 	var params []string
 
 	if len(tokens) >= 1 {
 		if (tokens[0])[0] == ':' {
-			_ = tokens[0]
+			prefix = tokens[0]
 
 			if len(tokens) < 2 {
 				log.Println("Error: Bad message format. Got Prefix but no Command.")
@@ -143,5 +163,5 @@ func (self *IRCConn) translateMessage(message string) {
 		}
 	}
 
-	self.handleCommand(command, params)
+	ircCon.handleCommand(prefix, command, params)
 }

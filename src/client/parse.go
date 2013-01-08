@@ -51,7 +51,8 @@ func parse_TOPIC(params []string) (chanName string, topic string, err error) {
 
 	chanName = params[0]
 
-	for _, val := range params[1:] {
+	topic = strings.Trim(params[1], ":")
+	for _, val := range params[2:] {
 		topic = topic + SPACE + val
 	}
 
